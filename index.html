@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Personal home workout tracker — log workouts, track progress, visualise improvement with beautiful animated graphs. No server, all data stays local.">
+  <meta name="theme-color" content="#D174D2">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Workout Tracker — Your Personal Fitness Companion</title>
+  <link rel="manifest" href="manifest.json">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+
+  <!-- jsPDF + html2canvas -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Background Effects -->
+  <div class="bg-mesh"></div>
+  <div class="bg-grain"></div>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- App Layout -->
+  <div class="app-layout">
+
+    <!-- ===== SIDEBAR (Desktop) ===== -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-logo">
+          <div class="sidebar-logo-icon">🏋️</div>
+          <span class="sidebar-logo-text">WorkoutTracker</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <button class="sidebar-nav-item active" data-page="dashboard">
+          <i data-lucide="home"></i>
+          <span>Dashboard</span>
+        </button>
+        <button class="sidebar-nav-item" data-page="workouts">
+          <i data-lucide="clipboard-list"></i>
+          <span>Workouts</span>
+        </button>
+        <button class="sidebar-nav-item" data-page="library">
+          <i data-lucide="book-open"></i>
+          <span>Library</span>
+        </button>
+        <button class="sidebar-nav-item" data-page="progress">
+          <i data-lucide="bar-chart-3"></i>
+          <span>Progress</span>
+        </button>
+        <button class="sidebar-nav-item" data-page="settings">
+          <i data-lucide="settings"></i>
+          <span>Settings</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <button class="theme-toggle" id="sidebar-theme-toggle" title="Toggle theme">
+          <i data-lucide="sun"></i>
+        </button>
+      </div>
+    </aside>
+
+    <!-- ===== MAIN CONTENT ===== -->
+    <main class="main-content">
+
+      <!-- ===== PAGE 1: DASHBOARD ===== -->
+      <section id="page-dashboard" class="page-view active">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Dashboard</h1>
+            <p class="page-subtitle" id="dashboard-greeting">Welcome back! Let's crush it today.</p>
+          </div>
+          <div class="flex items-center gap-md">
+            <span class="badge badge-streak" id="streak-badge">🔥 0 Day Streak</span>
+            <button class="theme-toggle" id="theme-toggle-btn" title="Toggle theme">
+              <i data-lucide="sun"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Today's Workout Card -->
+        <div class="card mb-xl" id="today-workout-card">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="card-title" id="today-workout-title">Ready to train?</h3>
+              <p class="text-secondary text-sm mt-sm" id="today-workout-subtitle">Start a new workout or pick a routine.</p>
+            </div>
+            <button class="btn btn-primary btn-lg" id="dashboard-start-btn">
+              <i data-lucide="play"></i> Start Workout
+            </button>
+          </div>
+        </div>
+
+        <!-- Quick Stats -->
+        <div class="stats-grid" id="quick-stats">
+          <div class="stat-card">
+            <div class="stat-icon purple"><i data-lucide="dumbbell"></i></div>
+            <div class="stat-value" id="stat-total-workouts">0</div>
+            <div class="stat-label">Total Workouts</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon navy"><i data-lucide="calendar-check"></i></div>
+            <div class="stat-value" id="stat-week-sessions">0</div>
+            <div class="stat-label">This Week</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon coral"><i data-lucide="flame"></i></div>
+            <div class="stat-value" id="stat-current-streak">0</div>
+            <div class="stat-label">Current Streak</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon green"><i data-lucide="trophy"></i></div>
+            <div class="stat-value" id="stat-prs-month">0</div>
+            <div class="stat-label">PRs This Month</div>
+          </div>
+        </div>
+
+        <!-- Heatmap + Radar -->
+        <div class="two-col mb-xl">
+          <div class="card-static">
+            <div class="card-header">
+              <h3 class="card-title">Your Consistency</h3>
+            </div>
+            <div class="heatmap-container" id="heatmap-container">
+              <!-- Heatmap grid rendered by JS -->
+            </div>
+            <div class="heatmap-legend">
+              <span>Less</span>
+              <div class="heatmap-legend-cell" style="background:var(--bg-tertiary);"></div>
+              <div class="heatmap-legend-cell" style="background:rgba(209,116,210,0.2);"></div>
+              <div class="heatmap-legend-cell" style="background:rgba(209,116,210,0.45);"></div>
+              <div class="heatmap-legend-cell" style="background:rgba(209,116,210,0.7);"></div>
+              <div class="heatmap-legend-cell" style="background:var(--color-purple);"></div>
+              <span>More</span>
+            </div>
+          </div>
+          <div class="card-static">
+            <div class="card-header">
+              <h3 class="card-title">This Week's Focus</h3>
+            </div>
+            <div class="chart-container" style="height:220px;">
+              <canvas id="mini-radar-chart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="card-static">
+          <div class="card-header">
+            <h3 class="card-title">Recent Activity</h3>
+          </div>
+          <div class="activity-feed" id="recent-activity">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== PAGE 2: WORKOUTS ===== -->
+      <section id="page-workouts" class="page-view">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Workouts</h1>
+            <p class="page-subtitle">Build routines and log your sessions.</p>
+          </div>
+          <button class="btn btn-primary" id="create-routine-btn">
+            <i data-lucide="plus"></i> Create Routine
+          </button>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+          <button class="tab-btn active" data-tab="workout-routines-tab">Routines</button>
+          <button class="tab-btn" data-tab="workout-session-tab">Log Session</button>
+        </div>
+
+        <!-- Routines Tab -->
+        <div class="tab-content active" id="workout-routines-tab">
+          <div class="routine-grid" id="routines-grid">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+
+        <!-- Session Tab -->
+        <div class="tab-content" id="workout-session-tab">
+          <div id="session-content">
+            <!-- Active session rendered by JS -->
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== PAGE 3: EXERCISE LIBRARY ===== -->
+      <section id="page-library" class="page-view">
+        <div class="page-header" style="display:flex; justify-content:space-between; align-items:center;">
+          <h1 class="page-title">Exercise Library</h1>
+          <button class="btn btn-primary btn-sm" id="add-custom-exercise-btn">
+            <i data-lucide="plus"></i> Add Custom
+          </button>
+        </div>
+
+        <div class="search-bar">
+          <i data-lucide="search"></i>
+          <input type="text" id="exercise-search" placeholder="Search exercises...">
+        </div>
+
+        <div class="mb-lg">
+          <label class="form-label mb-sm text-xs">Muscle Group</label>
+          <div class="filter-row" id="filter-muscle-group"></div>
+        </div>
+        <div class="mb-lg">
+          <label class="form-label mb-sm text-xs">Difficulty</label>
+          <div class="filter-row" id="filter-difficulty"></div>
+        </div>
+        <div class="mb-xl">
+          <label class="form-label mb-sm text-xs">Equipment</label>
+          <div class="filter-row" id="filter-equipment"></div>
+        </div>
+
+        <div class="exercise-grid" id="exercise-grid">
+          <!-- Rendered by JS -->
+        </div>
+      </section>
+
+      <!-- ===== PAGE 4: PROGRESS ===== -->
+      <section id="page-progress" class="page-view">
+        <div class="page-header">
+          <h1 class="page-title">Progress & Analytics</h1>
+        </div>
+
+        <!-- Section 1: Strength Progress -->
+        <div class="section">
+          <h2 class="section-title">💪 Strength Progress</h2>
+          <div class="flex items-center gap-lg mb-xl" style="flex-wrap:wrap;">
+            <div class="form-group" style="margin-bottom:0;min-width:200px;">
+              <select class="form-select" id="progress-exercise-select">
+                <option value="">Select Exercise ▼</option>
+              </select>
+            </div>
+            <div class="time-range-tabs" id="strength-range-tabs">
+              <button class="time-range-btn" data-range="1W">1W</button>
+              <button class="time-range-btn active" data-range="1M">1M</button>
+              <button class="time-range-btn" data-range="2M">2M</button>
+              <button class="time-range-btn" data-range="3M">3M</button>
+              <button class="time-range-btn" data-range="6M">6M</button>
+              <button class="time-range-btn" data-range="1Y">1Y</button>
+            </div>
+            <div class="metric-toggle">
+              <button class="metric-btn active" data-metric="weight">Weight</button>
+              <button class="metric-btn" data-metric="volume">Volume</button>
+              <button class="metric-btn" data-metric="reps">Reps</button>
+              <button class="metric-btn" data-metric="sets">Sets</button>
+            </div>
+          </div>
+          <div class="card-static">
+            <div class="chart-container" style="height:300px;">
+              <canvas id="strength-chart"></canvas>
+            </div>
+          </div>
+
+          <!-- PR History Table -->
+          <div class="card-static mt-xl">
+            <div class="card-header">
+              <h3 class="card-title">PR History</h3>
+            </div>
+            <div style="overflow-x:auto;">
+              <table class="pr-table" id="pr-history-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Reps</th>
+                    <th>Weight</th>
+                    <th>Volume</th>
+                  </tr>
+                </thead>
+                <tbody id="pr-history-body">
+                  <tr><td colspan="4" style="text-align:center;color:var(--text-tertiary);padding:var(--space-2xl);">Select an exercise to view PR history</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2: Workout Consistency -->
+        <div class="section">
+          <h2 class="section-title">📅 Workout Consistency</h2>
+          <div class="two-col">
+            <div class="card-static">
+              <div class="card-header">
+                <h3 class="card-title">Sessions per Week</h3>
+              </div>
+              <div class="chart-container" style="height:250px;">
+                <canvas id="consistency-chart"></canvas>
+              </div>
+            </div>
+            <div class="card-static">
+              <div class="card-header">
+                <h3 class="card-title">Avg Duration Trend</h3>
+              </div>
+              <div class="chart-container" style="height:250px;">
+                <canvas id="duration-chart"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Streak Stats -->
+          <div class="stats-grid mt-xl">
+            <div class="stat-card">
+              <div class="stat-icon coral"><i data-lucide="flame"></i></div>
+              <div class="stat-value" id="progress-current-streak">0</div>
+              <div class="stat-label">Current Streak</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon purple"><i data-lucide="award"></i></div>
+              <div class="stat-value" id="progress-longest-streak">0</div>
+              <div class="stat-label">Longest Streak</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon navy"><i data-lucide="dumbbell"></i></div>
+              <div class="stat-value" id="progress-total-workouts">0</div>
+              <div class="stat-label">Total Workouts</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon green"><i data-lucide="clock"></i></div>
+              <div class="stat-value" id="progress-total-time">0m</div>
+              <div class="stat-label">Total Time</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 3: Muscle Group Focus -->
+        <div class="section">
+          <h2 class="section-title">🎯 Muscle Group Focus</h2>
+          <div class="card-static">
+            <div class="flex items-center justify-between mb-xl">
+              <div class="time-range-tabs" id="radar-range-tabs">
+                <button class="time-range-btn" data-range="1W">1W</button>
+                <button class="time-range-btn active" data-range="1M">1M</button>
+                <button class="time-range-btn" data-range="3M">3M</button>
+                <button class="time-range-btn" data-range="6M">6M</button>
+              </div>
+            </div>
+            <div class="chart-container" style="height:350px;max-width:500px;margin:0 auto;">
+              <canvas id="radar-chart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 4: Body Progress -->
+        <div class="section">
+          <h2 class="section-title">📏 Body Progress</h2>
+          <div class="card-static mb-xl">
+            <div class="card-header">
+              <h3 class="card-title">Log Measurement</h3>
+            </div>
+            <form id="body-progress-form" class="body-progress-form">
+              <div class="form-group">
+                <label class="form-label">Date</label>
+                <input type="date" class="form-input form-input-sm" id="bp-date">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Weight</label>
+                <input type="number" class="form-input form-input-sm" id="bp-weight" step="0.1" placeholder="kg">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Body Fat %</label>
+                <input type="number" class="form-input form-input-sm" id="bp-bodyfat" step="0.1" placeholder="%">
+              </div>
+              <div class="form-group">
+                <label class="form-label">BMI</label>
+                <input type="number" class="form-input form-input-sm" id="bp-bmi" step="0.1" placeholder="BMI">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Chest</label>
+                <input type="number" class="form-input form-input-sm" id="bp-chest" step="0.1" placeholder="cm">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Waist</label>
+                <input type="number" class="form-input form-input-sm" id="bp-waist" step="0.1" placeholder="cm">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Hips</label>
+                <input type="number" class="form-input form-input-sm" id="bp-hips" step="0.1" placeholder="cm">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Arms</label>
+                <input type="number" class="form-input form-input-sm" id="bp-arms" step="0.1" placeholder="cm">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Thighs</label>
+                <input type="number" class="form-input form-input-sm" id="bp-thighs" step="0.1" placeholder="cm">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Notes</label>
+                <input type="text" class="form-input form-input-sm" id="bp-notes" placeholder="Notes...">
+              </div>
+              <div class="form-group" style="justify-content:flex-end;">
+                <button type="submit" class="btn btn-primary btn-sm">
+                  <i data-lucide="plus"></i> Save
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <div class="two-col">
+            <div class="card-static">
+              <div class="card-header">
+                <h3 class="card-title">Weight Over Time</h3>
+              </div>
+              <div class="chart-container" style="height:250px;">
+                <canvas id="body-weight-chart"></canvas>
+              </div>
+            </div>
+            <div class="card-static">
+              <div class="card-header">
+                <h3 class="card-title">Summary</h3>
+              </div>
+              <div id="body-progress-summary" style="padding:var(--space-lg) 0;">
+                <p class="text-secondary text-sm">No data recorded yet. Add your first measurement above.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 5: PR Tracker Board -->
+        <div class="section">
+          <h2 class="section-title">🏆 PR Tracker Board</h2>
+          <div class="flex items-center gap-md mb-xl">
+            <label class="form-label text-sm" style="margin:0;">Sort by:</label>
+            <select class="form-select form-input-sm" id="pr-sort-select" style="width:auto;">
+              <option value="recent">Recent PR</option>
+              <option value="name">Exercise Name</option>
+              <option value="category">Category</option>
+            </select>
+          </div>
+          <div class="pr-grid" id="pr-grid">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== PAGE 5: SETTINGS ===== -->
+      <section id="page-settings" class="page-view">
+        <div class="page-header">
+          <h1 class="page-title">Settings</h1>
+        </div>
+
+        <!-- Theme -->
+        <div class="settings-section">
+          <h3 class="settings-section-title">Appearance</h3>
+          <div class="settings-row">
+            <div class="settings-row-left">
+              <div class="settings-row-label">Dark Mode</div>
+              <div class="settings-row-desc">Toggle between dark and light theme</div>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="settings-theme-toggle" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Units -->
+        <div class="settings-section">
+          <h3 class="settings-section-title">Units</h3>
+          <div class="settings-row">
+            <div class="settings-row-left">
+              <div class="settings-row-label">Weight Unit</div>
+              <div class="settings-row-desc">Choose kg or lbs for weight tracking</div>
+            </div>
+            <select class="form-select form-input-sm" id="settings-weight-unit" style="width:auto;">
+              <option value="metric">kg / cm</option>
+              <option value="imperial">lbs / inches</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Timer -->
+        <div class="settings-section">
+          <h3 class="settings-section-title">Rest Timer</h3>
+          <div class="settings-row">
+            <div class="settings-row-left">
+              <div class="settings-row-label">Enable Rest Timer</div>
+              <div class="settings-row-desc">Automatically start rest timer between sets</div>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="settings-rest-toggle" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="settings-row">
+            <div class="settings-row-left">
+              <div class="settings-row-label">Default Rest Duration</div>
+              <div class="settings-row-desc">Default rest time between sets (seconds)</div>
+            </div>
+            <input type="number" class="form-input number-input form-input-sm" id="settings-rest-timer" value="60" min="10" max="300" step="5">
+          </div>
+        </div>
+
+        <!-- Data Management -->
+        <div class="settings-section">
+          <h3 class="settings-section-title">Data Management</h3>
+          <div class="settings-row">
+            <div class="settings-row-left">
+              <div class="settings-row-label">Export Data</div>
+              <div class="settings-row-desc">Download all your workout data as JSON</div>
+            </div>
+            <button class="btn btn-secondary btn-sm" id="settings-export-json">
+              <i data-lucide="download"></i> Export JSON
+            </button>
+          </div>
+          <div class="settings-row">
+            <div class="settings-row-left">
+              <div class="settings-row-label">Import Data</div>
+              <div class="settings-row-desc">Import a previously exported JSON backup</div>
+            </div>
+            <div class="flex gap-sm">
+              <input type="file" id="settings-import-file" accept=".json" style="display:none;">
+              <button class="btn btn-secondary btn-sm" id="settings-import-json">
+                <i data-lucide="upload"></i> Import JSON
+              </button>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-row-left">
+              <div class="settings-row-label">Export PDF Report</div>
+              <div class="settings-row-desc">Generate a progress report as PDF</div>
+            </div>
+            <button class="btn btn-secondary btn-sm" id="settings-export-pdf">
+              <i data-lucide="file-text"></i> Export PDF
+            </button>
+          </div>
+          <div class="settings-row">
+            <div class="settings-row-left">
+              <div class="settings-row-label">Clear All Data</div>
+              <div class="settings-row-desc">Permanently delete all data. This cannot be undone!</div>
+            </div>
+            <button class="btn btn-danger btn-sm" id="settings-clear-data">
+              <i data-lucide="trash-2"></i> Clear All
+            </button>
+          </div>
+        </div>
+
+        <!-- About -->
+        <div class="settings-section">
+          <h3 class="settings-section-title">About</h3>
+          <div class="settings-row">
+            <div class="settings-row-left">
+              <div class="settings-row-label">Workout Tracker</div>
+              <div class="settings-row-desc">Version 1.0.0 · Built with ❤️ and vanilla JS</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- ===== BOTTOM NAV (Mobile) ===== -->
+    <nav class="bottom-nav">
+      <div class="bottom-nav-inner">
+        <button class="bottom-nav-item active" data-page="dashboard">
+          <i data-lucide="home"></i>
+          <span>Home</span>
+        </button>
+        <button class="bottom-nav-item" data-page="workouts">
+          <i data-lucide="clipboard-list"></i>
+          <span>Workouts</span>
+        </button>
+        <button class="bottom-nav-item" data-page="library">
+          <i data-lucide="book-open"></i>
+          <span>Library</span>
+        </button>
+        <button class="bottom-nav-item" data-page="progress">
+          <i data-lucide="bar-chart-3"></i>
+          <span>Progress</span>
+        </button>
+        <button class="bottom-nav-item" data-page="settings">
+          <i data-lucide="settings"></i>
+          <span>Settings</span>
+        </button>
+      </div>
+    </nav>
+  </div>
+
+  <!-- ===== MODALS ===== -->
+
+  <!-- Exercise Detail Modal -->
+  <div id="exercise-detail-modal" class="modal-overlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title">Exercise Details</h3>
+        <button class="modal-close" onclick="document.getElementById('exercise-detail-modal').classList.remove('active');document.body.style.overflow='';">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <!-- Rendered by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Exercise Picker Modal -->
+  <div id="exercise-picker-modal" class="modal-overlay" style="z-index: 9999;">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title">Add Exercise</h3>
+        <button class="modal-close" onclick="document.getElementById('exercise-picker-modal').classList.remove('active');document.body.style.overflow='';">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <!-- Rendered by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Routine Editor Modal -->
+  <div id="routine-editor-modal" class="modal-overlay">
+    <div class="modal" style="max-width:700px;">
+      <div class="modal-header">
+        <h3 class="modal-title">Create Routine</h3>
+        <button class="modal-close" onclick="document.getElementById('routine-editor-modal').classList.remove('active');document.body.style.overflow='';">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <!-- Rendered by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Routine Picker Modal -->
+  <div id="routine-picker-modal" class="modal-overlay" style="z-index: 9999;">
+    <div class="modal" style="max-width: 400px;">
+      <div class="modal-header">
+        <h3 class="modal-title">Select Routine</h3>
+        <button class="modal-close" onclick="document.getElementById('routine-picker-modal').classList.remove('active');document.body.style.overflow='';">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <!-- Rendered by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Session Summary Modal -->
+  <div id="session-summary-modal" class="modal-overlay">
+    <div class="modal" style="max-width:480px;">
+      <div class="modal-header">
+        <h3 class="modal-title">Workout Summary</h3>
+        <button class="modal-close" onclick="document.getElementById('session-summary-modal').classList.remove('active');document.body.style.overflow='';">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <!-- Rendered by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Rest Timer Overlay -->
+  <div id="rest-timer-overlay" class="rest-timer-overlay">
+    <div class="rest-timer-circle">
+      <svg viewBox="0 0 200 200">
+        <circle class="track" cx="100" cy="100" r="90"/>
+        <circle class="progress" id="rest-timer-progress" cx="100" cy="100" r="90"
+          stroke-dasharray="565.48" stroke-dashoffset="0"/>
+      </svg>
+      <div class="rest-timer-time">
+        <div class="time" id="rest-timer-time">01:00</div>
+        <div class="label">Rest Time</div>
+      </div>
+    </div>
+    <div class="rest-timer-actions">
+      <button class="btn btn-secondary" id="skip-rest-btn">
+        <i data-lucide="skip-forward"></i> Skip
+      </button>
+      <button class="btn btn-primary" id="add-rest-btn">
+        <i data-lucide="plus"></i> +15s
+      </button>
+    </div>
+  </div>
+
+  <!-- Custom Exercise Modal -->
+  <div id="custom-exercise-modal" class="modal-overlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title">Create Custom Exercise</h3>
+        <button class="modal-close" onclick="document.getElementById('custom-exercise-modal').classList.remove('active');document.body.style.overflow='';">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Exercise Name</label>
+          <input type="text" class="form-input" id="custom-ex-name" placeholder="e.g. Weighted Pull-up">
+        </div>
+        <div class="flex gap-md mb-md">
+          <div class="form-group" style="flex:1;">
+            <label class="form-label">Muscle Group</label>
+            <select class="form-select" id="custom-ex-muscle">
+              <option value="Chest">Chest</option>
+              <option value="Back">Back</option>
+              <option value="Shoulders">Shoulders</option>
+              <option value="Arms">Arms</option>
+              <option value="Legs">Legs</option>
+              <option value="Core">Core</option>
+              <option value="Cardio">Cardio</option>
+            </select>
+          </div>
+          <div class="form-group" style="flex:1;">
+            <label class="form-label">Difficulty</label>
+            <select class="form-select" id="custom-ex-difficulty">
+              <option value="Beginner">Beginner</option>
+              <option value="Intermediate">Intermediate</option>
+              <option value="Advanced">Advanced</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Equipment</label>
+          <select class="form-select" id="custom-ex-equipment">
+            <option value="Bodyweight">Bodyweight</option>
+            <option value="Dumbbells">Dumbbells</option>
+            <option value="Barbell">Barbell</option>
+            <option value="Cables">Cables</option>
+            <option value="Machine">Machine</option>
+            <option value="Kettlebell">Kettlebell</option>
+            <option value="Resistance Band">Resistance Band</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="form-group flex items-center justify-between mt-lg mb-xl">
+          <label class="form-label" style="margin:0;">Is this a time-based exercise?</label>
+          <label class="toggle">
+            <input type="checkbox" id="custom-ex-timebased">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <button class="btn btn-primary w-full" id="save-custom-exercise-btn">
+          <i data-lucide="check"></i> Save Exercise
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- App Scripts (Loaded Sequentially instead of Modules) -->
+  <script src="data/exerciseLibrary.js"></script>
+  <script src="modules/storage.js"></script>
+  <script src="modules/ui.js"></script>
+  <script src="modules/timer.js"></script>
+  <script src="modules/exercises.js"></script>
+  <script src="modules/workouts.js"></script>
+  <script src="modules/charts.js"></script>
+  <script src="modules/pdfExport.js"></script>
+  <script src="app.js"></script>
+
+</body>
+</html>
